@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumière — Skincare Recommender Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --cream:      #F5EFE6;
+    --cream-dark: #EDE3D5;
+    --blush:      #D4A5A5;
+    --blush-deep: #B87878;
+    --sage:       #8A9E8C;
+    --sage-light: #B5C5B7;
+    --espresso:   #2C1A0E;
+    --mocha:      #5C3D2E;
+    --gold:       #C9A96E;
+    --gold-light: #E8D5B0;
+    --white:      #FDFAF6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--espresso);
+    font-size: 15px;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* ── LOADING SCREEN ── */
+  #loadingScreen {
+    position: fixed;
+    inset: 0;
+    background: var(--espresso);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+  }
+  #loadingScreen.hidden { opacity: 0; visibility: hidden; }
+  .loading-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.5rem;
+    font-weight: 300;
+    color: var(--cream);
+    letter-spacing: 0.15em;
+    margin-bottom: 2rem;
+  }
+  .loading-logo span { color: var(--blush); font-style: italic; }
+  .loading-bar-wrap {
+    width: 200px;
+    height: 1px;
+    background: rgba(245,239,230,0.15);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .loading-bar {
+    height: 100%;
+    background: var(--gold);
+    border-radius: 1px;
+    animation: loadProgress 1.8s ease forwards;
+  }
+  @keyframes loadProgress { from { width: 0; } to { width: 100%; } }
+  .loading-status {
+    margin-top: 1rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(245,239,230,0.35);
+  }
+  .loading-error {
+    margin-top: 1.5rem;
+    font-size: 0.82rem;
+    color: var(--blush);
+    text-align: center;
+    max-width: 360px;
+    display: none;
+    line-height: 1.6;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.2rem 4rem;
+    background: rgba(245, 239, 230, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(201, 169, 110, 0.2);
+  }
+  .nav-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.6rem;
+    font-weight: 300;
+    letter-spacing: 0.12em;
+    color: var(--espresso);
+    text-decoration: none;
+  }
+  .nav-logo span { color: var(--blush-deep); font-style: italic; }
+  .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+  .nav-links a {
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--mocha);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--blush-deep); }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8rem 4rem 4rem 4rem;
+    position: relative;
+    z-index: 2;
+  }
+  .hero-eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--blush-deep);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+  .hero-eyebrow::before { content: ''; display: block; width: 2rem; height: 1px; background: var(--blush-deep); }
+  .hero h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(3rem, 5vw, 5.5rem);
+    font-weight: 300;
+    line-height: 1.1;
+    color: var(--espresso);
+    margin-bottom: 1.5rem;
+  }
+  .hero h1 em { font-style: italic; color: var(--blush-deep); }
+  .hero-desc {
+    font-size: 1rem;
+    color: var(--mocha);
+    max-width: 420px;
+    margin-bottom: 3rem;
+    line-height: 1.75;
+    font-weight: 300;
+  }
+  .hero-stats { display: flex; gap: 2.5rem; }
+  .hero-stat-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.2rem;
+    font-weight: 500;
+    color: var(--espresso);
+    line-height: 1;
+  }
+  .hero-stat-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-top: 0.3rem;
+  }
+  .hero-right { position: relative; overflow: hidden; }
+  .hero-bg-shape {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--cream-dark) 0%, var(--gold-light) 50%, var(--blush) 100%);
+  }
+  .hero-circle {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(201, 169, 110, 0.3);
+  }
+  .hero-circle-1 { width: 500px; height: 500px; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+  .hero-circle-2 { width: 380px; height: 380px; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(245, 239, 230, 0.15); }
+  .hero-circle-3 { width: 240px; height: 240px; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(245, 239, 230, 0.25); }
+  .hero-floating-card {
+    position: absolute;
+    background: rgba(253, 250, 246, 0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(201, 169, 110, 0.25);
+    border-radius: 16px;
+    padding: 1.2rem 1.5rem;
+    box-shadow: 0 8px 32px rgba(44, 26, 14, 0.08);
+  }
+  .hero-card-1 { bottom: 25%; left: 8%; }
+  .hero-card-2 { top: 22%; right: 8%; }
+  .hero-card-label { font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--sage); }
+  .hero-card-value { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 500; color: var(--espresso); }
+  .hero-card-sub { font-size: 0.75rem; color: var(--blush-deep); margin-top: 0.1rem; }
+  .hero-center-badge {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 160px; height: 160px;
+    background: var(--espresso);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--cream);
+    z-index: 3;
+  }
+  .hero-center-badge-num { font-family: 'Cormorant Garamond', serif; font-size: 2.4rem; font-weight: 300; line-height: 1; }
+  .hero-center-badge-label { font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.7; margin-top: 0.3rem; }
+
+  /* ── SECTIONS ── */
+  section { padding: 6rem 4rem; }
+  .section-eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--blush-deep);
+    margin-bottom: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+  .section-eyebrow::before { content: ''; display: block; width: 2rem; height: 1px; background: var(--blush-deep); }
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 3.5vw, 3.2rem);
+    font-weight: 300;
+    line-height: 1.2;
+    color: var(--espresso);
+    margin-bottom: 3rem;
+  }
+  .section-title em { font-style: italic; color: var(--blush-deep); }
+
+  /* ── OVERVIEW ── */
+  #overview { background: var(--white); }
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5px;
+    background: rgba(201, 169, 110, 0.2);
+    border: 1.5px solid rgba(201, 169, 110, 0.2);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 4rem;
+  }
+  .overview-card {
+    background: var(--white);
+    padding: 2.5rem 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .overview-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 2rem; right: 2rem;
+    height: 2px;
+    background: linear-gradient(90deg, var(--blush), transparent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s ease;
+  }
+  .overview-card:hover::after { transform: scaleX(1); }
+  .overview-card-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; font-size: 1.3rem; }
+  .icon-rose  { background: rgba(212, 165, 165, 0.2); }
+  .icon-sage  { background: rgba(138, 158, 140, 0.2); }
+  .icon-gold  { background: rgba(201, 169, 110, 0.2); }
+  .icon-mocha { background: rgba(92, 61, 46, 0.15); }
+  .overview-num { font-family: 'Cormorant Garamond', serif; font-size: 2.8rem; font-weight: 400; color: var(--espresso); line-height: 1; margin-bottom: 0.4rem; }
+  .overview-label { font-size: 0.8rem; letter-spacing: 0.06em; color: var(--mocha); font-weight: 300; }
+  .overview-sub { font-size: 0.72rem; color: var(--sage); margin-top: 0.3rem; }
+
+  /* ── CHARTS ── */
+  #insights { background: var(--cream); }
+  .charts-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 2rem; margin-bottom: 2rem; }
+  .charts-grid-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+  .chart-card {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 2rem 2rem 1.5rem;
+    border: 1px solid rgba(201, 169, 110, 0.15);
+    box-shadow: 0 2px 20px rgba(44, 26, 14, 0.04);
+  }
+  .chart-card-title { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 400; color: var(--espresso); margin-bottom: 0.3rem; }
+  .chart-card-sub { font-size: 0.75rem; color: var(--sage); margin-bottom: 1.5rem; }
+  .chart-wrap { position: relative; }
+
+  /* ── RECOMMENDER ── */
+  #recommender { background: var(--espresso); }
+  #recommender .section-eyebrow { color: var(--gold); }
+  #recommender .section-eyebrow::before { background: var(--gold); }
+  #recommender .section-title { color: var(--cream); }
+  #recommender .section-title em { color: var(--blush); }
+  .rec-search-wrap { display: flex; gap: 1rem; margin-bottom: 3rem; max-width: 560px; }
+  .rec-input {
+    flex: 1;
+    background: rgba(245, 239, 230, 0.08);
+    border: 1px solid rgba(201, 169, 110, 0.3);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    color: var(--cream);
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .rec-input::placeholder { color: rgba(245, 239, 230, 0.35); }
+  .rec-input:focus { border-color: var(--gold); background: rgba(245, 239, 230, 0.12); }
+  .rec-btn {
+    background: var(--gold);
+    color: var(--espresso);
+    border: none;
+    border-radius: 12px;
+    padding: 1rem 2rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .rec-btn:hover { background: var(--gold-light); transform: translateY(-1px); }
+  .rec-results { display: none; }
+  .rec-results.visible { display: block; }
+  .rec-user-info {
+    background: rgba(245, 239, 230, 0.06);
+    border: 1px solid rgba(201, 169, 110, 0.2);
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+  .rec-user-avatar {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, var(--blush), var(--gold));
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.4rem;
+    color: var(--white);
+    flex-shrink: 0;
+  }
+  .rec-user-id { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; color: var(--cream); }
+  .rec-user-meta { font-size: 0.78rem; color: rgba(245, 239, 230, 0.5); margin-top: 0.2rem; }
+  .rec-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; }
+  .rec-card {
+    background: rgba(245, 239, 230, 0.06);
+    border: 1px solid rgba(201, 169, 110, 0.15);
+    border-radius: 16px;
+    padding: 1.5rem 1.2rem;
+    transition: background 0.2s, transform 0.2s;
+    animation: fadeUp 0.4s ease both;
+  }
+  .rec-card:hover { background: rgba(245, 239, 230, 0.1); transform: translateY(-3px); }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .rec-card-rank { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.8rem; }
+  .rec-card-name { font-family: 'Cormorant Garamond', serif; font-size: 1.05rem; color: var(--cream); line-height: 1.35; margin-bottom: 0.4rem; }
+  .rec-card-brand { font-size: 0.72rem; color: rgba(245, 239, 230, 0.45); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; }
+  .rec-card-rating { display: flex; align-items: center; gap: 0.5rem; }
+  .rating-bar-wrap { flex: 1; height: 3px; background: rgba(245, 239, 230, 0.1); border-radius: 2px; overflow: hidden; }
+  .rating-bar-fill { height: 100%; background: linear-gradient(90deg, var(--blush), var(--gold)); border-radius: 2px; transition: width 0.6s ease 0.3s; }
+  .rating-val { font-family: 'Cormorant Garamond', serif; font-size: 0.95rem; color: var(--gold); min-width: 2.5rem; text-align: right; }
+  .rec-card-price { font-size: 0.75rem; color: rgba(245, 239, 230, 0.4); margin-top: 0.6rem; }
+  .rec-card-cat { display: inline-block; font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(138, 158, 140, 0.2); color: var(--sage-light); border-radius: 20px; padding: 0.2rem 0.6rem; margin-top: 0.6rem; }
+  .rec-not-found { display: none; text-align: center; padding: 3rem; color: rgba(245, 239, 230, 0.4); }
+  .rec-not-found.visible { display: block; }
+  .rec-not-found-icon { font-size: 2.5rem; margin-bottom: 0.8rem; }
+  .rec-not-found-text { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; }
+  .sample-ids-wrap { margin-top: 1.5rem; font-size: 0.75rem; color: rgba(245,239,230,0.25); letter-spacing: 0.05em; }
+  .sample-id-chip {
+    display: inline-block;
+    background: rgba(201,169,110,0.12);
+    color: rgba(201,169,110,0.7);
+    border: 1px solid rgba(201,169,110,0.2);
+    border-radius: 20px;
+    padding: 0.2rem 0.7rem;
+    margin: 0.2rem;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-family: 'DM Sans', monospace;
+  }
+  .sample-id-chip:hover { background: rgba(201,169,110,0.22); color: var(--gold); }
+
+  /* ── TOP PRODUCTS ── */
+  #products { background: var(--cream-dark); }
+  .products-table-wrap { background: var(--white); border-radius: 20px; overflow: hidden; border: 1px solid rgba(201, 169, 110, 0.15); }
+  .products-table { width: 100%; border-collapse: collapse; }
+  .products-table thead tr { background: var(--espresso); color: var(--cream); }
+  .products-table th { padding: 1.1rem 1.5rem; font-size: 0.68rem; letter-spacing: 0.15em; text-transform: uppercase; font-weight: 400; text-align: left; }
+  .products-table td { padding: 1rem 1.5rem; border-bottom: 1px solid rgba(201, 169, 110, 0.1); font-size: 0.88rem; color: var(--espresso); }
+  .products-table tbody tr:last-child td { border-bottom: none; }
+  .products-table tbody tr { transition: background 0.15s; }
+  .products-table tbody tr:hover { background: rgba(201, 169, 110, 0.05); }
+  .prod-rank { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; color: var(--blush-deep); font-weight: 400; }
+  .prod-name { font-weight: 500; }
+  .prod-brand { color: var(--sage); font-size: 0.78rem; }
+  .star-rating { color: var(--gold); letter-spacing: -0.05em; }
+  .prod-price { color: var(--mocha); }
+  .prod-reviews { color: var(--sage); }
+
+  /* ── FOOTER ── */
+  footer { background: var(--espresso); color: rgba(245, 239, 230, 0.4); text-align: center; padding: 2.5rem; font-size: 0.78rem; letter-spacing: 0.06em; }
+  footer span { color: var(--gold); }
+
+  /* ── ANIMATIONS ── */
+  .fade-in { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .fade-in.visible { opacity: 1; transform: translateY(0); }
+  .hero-left { animation: heroSlide 0.9s ease both; }
+  .hero-right { animation: heroFade 1.1s ease both 0.2s; }
+  @keyframes heroSlide { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes heroFade  { from { opacity: 0; } to { opacity: 1; } }
+  .hero-circle-1 { animation: spin 40s linear infinite; }
+  .hero-circle-2 { animation: spin 25s linear infinite reverse; }
+  @keyframes spin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+  .scroll-hint { position: absolute; bottom: 3rem; left: 4rem; display: flex; align-items: center; gap: 0.8rem; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--sage); animation: bounce 2s ease infinite; }
+  .scroll-hint::before { content: ''; display: block; width: 1px; height: 2.5rem; background: var(--sage); }
+  @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+
+  @media (max-width: 1100px) { .rec-cards { grid-template-columns: repeat(3, 1fr); } .charts-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .hero { grid-template-columns: 1fr; } .hero-right { display: none; } nav { padding: 1rem 2rem; } section { padding: 4rem 2rem; } .overview-grid { grid-template-columns: repeat(2, 1fr); } .rec-cards { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div id="loadingScreen">
+  <div class="loading-logo">lumi<span>ère</span></div>
+  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+  <div class="loading-status" id="loadingStatus">Loading data…</div>
+  <div class="loading-error" id="loadingError"></div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">lumi<span>ère</span></a>
+  <ul class="nav-links">
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#insights">Insights</a></li>
+    <li><a href="#recommender">Recommender</a></li>
+    <li><a href="#products">Top Products</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="home">
+  <div class="hero-left">
+    <p class="hero-eyebrow">AI-Powered Skincare Intelligence</p>
+    <h1>Discover your<br><em>perfect</em><br>skincare ritual</h1>
+    <p class="hero-desc">
+      A collaborative filtering recommender system trained on 487,057 Sephora reviews —
+      surfacing the products your skin has been waiting for.
+    </p>
+    <div class="hero-stats">
+      <div>
+        <div class="hero-stat-num" id="heroUsers">—</div>
+        <div class="hero-stat-label">Sampled Users</div>
+      </div>
+      <div>
+        <div class="hero-stat-num" id="heroProducts">—</div>
+        <div class="hero-stat-label">Products</div>
+      </div>
+      <div>
+        <div class="hero-stat-num" id="heroReviews">—</div>
+        <div class="hero-stat-label">Reviews</div>
+      </div>
+    </div>
+    <div class="scroll-hint">Scroll to explore</div>
+  </div>
+  <div class="hero-right">
+    <div class="hero-bg-shape"></div>
+    <div class="hero-circle hero-circle-1"></div>
+    <div class="hero-circle hero-circle-2"></div>
+    <div class="hero-circle hero-circle-3"></div>
+    <div class="hero-center-badge">
+      <div class="hero-center-badge-num" id="heroAvgRating">—</div>
+      <div class="hero-center-badge-label">Avg Rating</div>
+    </div>
+    <div class="hero-floating-card hero-card-1">
+      <div class="hero-card-label">Algorithm</div>
+      <div class="hero-card-value">Item-Item CF</div>
+      <div class="hero-card-sub">Pearson Correlation</div>
+    </div>
+    <div class="hero-floating-card hero-card-2">
+      <div class="hero-card-label">Avg predicted rating</div>
+      <div class="hero-card-value" id="heroPredRating">—</div>
+      <div class="hero-card-sub">Post bias correction</div>
+    </div>
+  </div>
+</section>
+
+<!-- OVERVIEW -->
+<section id="overview">
+  <p class="section-eyebrow fade-in">Dataset Overview</p>
+  <h2 class="section-title fade-in">The numbers<br>behind the <em>science</em></h2>
+  <div class="overview-grid fade-in">
+    <div class="overview-card">
+      <div class="overview-card-icon icon-rose">🌸</div>
+      <div class="overview-num" id="ovTotalReviews">—</div>
+      <div class="overview-label">Total Reviews</div>
+      <div class="overview-sub">Sephora skincare dataset</div>
+    </div>
+    <div class="overview-card">
+      <div class="overview-card-icon icon-sage">👤</div>
+      <div class="overview-num" id="ovTotalUsers">—</div>
+      <div class="overview-label">Unique Users</div>
+      <div class="overview-sub" id="ovUsersub">—</div>
+    </div>
+    <div class="overview-card">
+      <div class="overview-card-icon icon-gold">✨</div>
+      <div class="overview-num" id="ovProducts">—</div>
+      <div class="overview-label">Products</div>
+      <div class="overview-sub">After sparse filtering</div>
+    </div>
+    <div class="overview-card">
+      <div class="overview-card-icon icon-mocha">⭐</div>
+      <div class="overview-num" id="ovAvgRating">—</div>
+      <div class="overview-label">Global Mean Rating</div>
+      <div class="overview-sub" id="ovFiveStarPct">—</div>
+    </div>
+  </div>
+  <div class="overview-grid fade-in">
+    <div class="overview-card">
+      <div class="overview-card-icon icon-rose">🎯</div>
+      <div class="overview-num" id="ovRecsGenerated">—</div>
+      <div class="overview-label">Recommendations Generated</div>
+      <div class="overview-sub" id="ovAvgPerUser">—</div>
+    </div>
+    <div class="overview-card">
+      <div class="overview-card-icon icon-sage">📊</div>
+      <div class="overview-num" id="ovAvgPred">—</div>
+      <div class="overview-label">Avg Predicted Rating</div>
+      <div class="overview-sub">Post baseline correction</div>
+    </div>
+    <div class="overview-card">
+      <div class="overview-card-icon icon-gold">💰</div>
+      <div class="overview-num" id="ovAvgPrice">—</div>
+      <div class="overview-label">Average Product Price</div>
+      <div class="overview-sub">Across all 1,865 products</div>
+    </div>
+    <div class="overview-card">
+      <div class="overview-card-icon icon-mocha">🔗</div>
+      <div class="overview-num" id="ovCoverage">—</div>
+      <div class="overview-label">Recommendation Coverage</div>
+      <div class="overview-sub" id="ovCoverageSub">—</div>
+    </div>
+  </div>
+</section>
+
+<!-- INSIGHTS -->
+<section id="insights">
+  <p class="section-eyebrow fade-in">Data Insights</p>
+  <h2 class="section-title fade-in">What the<br>data <em>reveals</em></h2>
+  <div class="charts-grid fade-in">
+    <div class="chart-card">
+      <div class="chart-card-title">Rating Distribution</div>
+      <div class="chart-card-sub">Breakdown of all reviews by star rating</div>
+      <div class="chart-wrap" style="height:260px"><canvas id="chartRating"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Top Brands by Review Volume</div>
+      <div class="chart-card-sub">Most reviewed skincare brands in the dataset</div>
+      <div class="chart-wrap" style="height:260px"><canvas id="chartBrands"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-grid-bottom fade-in">
+    <div class="chart-card">
+      <div class="chart-card-title">Recommendation Coverage</div>
+      <div class="chart-card-sub">Users with vs without generated recommendations</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chartCoverage"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Price Distribution by Category</div>
+      <div class="chart-card-sub">Average product price per skincare category</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chartCategory"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- RECOMMENDER -->
+<section id="recommender">
+  <p class="section-eyebrow">Personal Recommender</p>
+  <h2 class="section-title">Find your<br><em>ritual</em></h2>
+  <div class="rec-search-wrap">
+    <input type="text" class="rec-input" id="userInput" placeholder="Enter a User ID…" />
+    <button class="rec-btn" onclick="lookupUser()">Discover →</button>
+  </div>
+  <div class="rec-not-found" id="notFound">
+    <div class="rec-not-found-icon">🔍</div>
+    <div class="rec-not-found-text">No recommendations found for this User ID.</div>
+    <div style="font-size:0.8rem;color:rgba(245,239,230,0.3);margin-top:0.5rem">This user may not be in the 35% sample, or has no positive-similarity neighbours.</div>
+  </div>
+  <div class="rec-results" id="recResults">
+    <div class="rec-user-info">
+      <div class="rec-user-avatar" id="userAvatar">U</div>
+      <div>
+        <div class="rec-user-id" id="userIdDisplay">User</div>
+        <div class="rec-user-meta" id="userMeta"></div>
+      </div>
+    </div>
+    <div class="rec-cards" id="recCards"></div>
+  </div>
+  <div class="sample-ids-wrap">
+    Sample user IDs from your data: <span id="sampleIds"></span>
+  </div>
+</section>
+
+<!-- TOP PRODUCTS -->
+<section id="products">
+  <p class="section-eyebrow fade-in">Curated Selection</p>
+  <h2 class="section-title fade-in">The community's<br><em>favourites</em></h2>
+  <div class="products-table-wrap fade-in">
+    <table class="products-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Product</th>
+          <th>Brand</th>
+          <th>Category</th>
+          <th>Avg Rating</th>
+          <th>Reviews</th>
+          <th>Price</th>
+        </tr>
+      </thead>
+      <tbody id="productsBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>Built with item-item collaborative filtering · <span>Pearson correlation</span> · Sephora Skincare Reviews</div>
+  <div style="margin-top:0.4rem">Lumière Skincare Intelligence Dashboard · Data from <span>output/</span> files</div>
+</footer>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// DATA — loaded from your real output/ files
+// ─────────────────────────────────────────────────────────────
+let STATS       = {};
+let TOP_PRODS   = [];
+let RECS        = {};
+let CATALOG     = [];   // from product_catalog.csv for category chart
+
+const FILES = {
+  stats:   'output/dashboard_stats.json',
+  prods:   'output/top_products.json',
+  recs:    'output/recommendations.json',
+  catalog: 'output/product_catalog.csv',
+};
+
+// ── CSV parser (lightweight, handles quoted fields) ──────────
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
+  return lines.slice(1).map(line => {
+    const vals = [];
+    let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    vals.push(cur.trim());
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = vals[i] ?? '');
+    return obj;
+  });
+}
+
+// ── Fetch all files in parallel ──────────────────────────────
+async function loadAllData() {
+  setStatus('Loading dashboard_stats.json…');
+
+  const [statsRes, prodsRes, recsRes, catalogRes] = await Promise.all([
+    fetch(FILES.stats),
+    fetch(FILES.prods),
+    fetch(FILES.recs),
+    fetch(FILES.catalog),
+  ]);
+
+  // Check for HTTP errors
+  for (const [name, res] of [['dashboard_stats.json', statsRes], ['top_products.json', prodsRes], ['recommendations.json', recsRes], ['product_catalog.csv', catalogRes]]) {
+    if (!res.ok) throw new Error(`Could not load ${name} (HTTP ${res.status}). Make sure you're opening the dashboard from a local server, not by double-clicking the file.`);
+  }
+
+  setStatus('Parsing recommendations (35 MB, please wait)…');
+  STATS     = await statsRes.json();
+  TOP_PRODS = await prodsRes.json();
+  RECS      = await recsRes.json();
+
+  setStatus('Parsing product catalog…');
+  const catalogText = await catalogRes.text();
+  CATALOG = parseCSV(catalogText);
+}
+
+function setStatus(msg) {
+  document.getElementById('loadingStatus').textContent = msg;
+}
+
+// ─────────────────────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await loadAllData();
+    populateHero();
+    populateOverview();
+    initCharts();
+    renderTopProducts();
+    renderSampleIds();
+    initScrollAnimations();
+    document.getElementById('userInput').addEventListener('keydown', e => { if (e.key === 'Enter') lookupUser(); });
+    document.getElementById('loadingScreen').classList.add('hidden');
+  } catch (err) {
+    const el = document.getElementById('loadingError');
+    el.style.display = 'block';
+    el.innerHTML = `⚠️ ${err.message}<br><br>
+      <strong>How to fix:</strong> Open a terminal in your project folder and run:<br>
+      <code style="font-size:0.78rem;opacity:0.7">python -m http.server 8080</code><br>
+      Then visit <code style="font-size:0.78rem;opacity:0.7">http://localhost:8080</code> in your browser.`;
+    document.getElementById('loadingStatus').style.display = 'none';
+    document.querySelector('.loading-bar').style.animationPlayState = 'paused';
+    console.error(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POPULATE
+// ─────────────────────────────────────────────────────────────
+function fmt(n) {
+  if (n === undefined || n === null) return '—';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(0) + 'K';
+  return String(n);
+}
+
+function populateHero() {
+  document.getElementById('heroUsers').textContent    = fmt(STATS.matrix_users);
+  document.getElementById('heroProducts').textContent = fmt(STATS.total_products);
+  document.getElementById('heroReviews').textContent  = fmt(STATS.total_reviews);
+  document.getElementById('heroAvgRating').textContent = (STATS.avg_rating ?? '—') + '★';
+  document.getElementById('heroPredRating').textContent = (STATS.avg_predicted_rating ?? '—') + ' ⭐';
+}
+
+function populateOverview() {
+  const s = STATS;
+  const ratingDist = s.rating_distribution ?? {};
+  const total = Object.values(ratingDist).reduce((a,b) => a+b, 0);
+  const fivePct = total ? ((ratingDist[5] ?? 0) / total * 100).toFixed(1) : '—';
+  const coverage = s.matrix_users ? ((s.users_with_recommendations / s.matrix_users) * 100).toFixed(1) : '—';
+
+  setText('ovTotalReviews',  fmt(s.total_reviews));
+  setText('ovTotalUsers',    fmt(s.total_users));
+  setText('ovUsersub',       `${fmt(s.matrix_users)} sampled (35%)`);
+  setText('ovProducts',      fmt(s.total_products));
+  setText('ovAvgRating',     s.avg_rating ?? '—');
+  setText('ovFiveStarPct',   `${fivePct}% are 5-star reviews`);
+  setText('ovRecsGenerated', fmt(s.total_recommendations_generated));
+  setText('ovAvgPerUser',    `avg ${s.avg_recommendations_per_user ?? '—'} per user`);
+  setText('ovAvgPred',       s.avg_predicted_rating ?? '—');
+  setText('ovAvgPrice',      s.avg_price ? `$${parseFloat(s.avg_price).toFixed(2)}` : '—');
+  setText('ovCoverage',      `${coverage}%`);
+  setText('ovCoverageSub',   `${fmt(s.users_with_recommendations)} of ${fmt(s.matrix_users)} users`);
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// ─────────────────────────────────────────────────────────────
+// CHARTS
+// ─────────────────────────────────────────────────────────────
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+Chart.defaults.color = '#5C3D2E';
+
+const C = {
+  blush:  'rgba(212,165,165,0.85)',   blushL: 'rgba(212,165,165,0.3)',
+  sage:   'rgba(138,158,140,0.85)',   sageL:  'rgba(138,158,140,0.3)',
+  gold:   'rgba(201,169,110,0.85)',   goldL:  'rgba(201,169,110,0.3)',
+  mocha:  'rgba(92,61,46,0.85)',
+  esp:    'rgba(44,26,14,0.85)',
+};
+
+function initCharts() {
+  chartRating();
+  chartBrands();
+  chartCoverage();
+  chartCategory();
+}
+
+function chartRating() {
+  const dist = STATS.rating_distribution ?? {};
+  const labels = Object.keys(dist).sort().map(k => `${k} ★`);
+  const data   = Object.keys(dist).sort().map(k => dist[k]);
+  new Chart(document.getElementById('chartRating'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Reviews', data, backgroundColor: [C.mocha, C.blush, C.sage, C.gold, C.esp], borderRadius: 8, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, border: { display: false } },
+        y: { grid: { color: 'rgba(201,169,110,0.1)' }, border: { display: false }, ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(0)+'K' : v } }
+      }
+    }
+  });
+}
+
+function chartBrands() {
+  const brands = STATS.top_brands ?? {};
+  const entries = Object.entries(brands).sort((a,b) => b[1]-a[1]).slice(0,8);
+  const colors = [C.blush,C.sage,C.gold,C.mocha,C.blush,C.sage,C.gold,C.mocha];
+  new Chart(document.getElementById('chartBrands'), {
+    type: 'bar',
+    data: {
+      labels: entries.map(e => e[0]),
+      datasets: [{ label: 'Reviews', data: entries.map(e => e[1]), backgroundColor: colors, borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(201,169,110,0.1)' }, border: { display: false }, ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(0)+'K' : v } },
+        y: { grid: { display: false }, border: { display: false } }
+      }
+    }
+  });
+}
+
+function chartCoverage() {
+  const covered = STATS.users_with_recommendations ?? 0;
+  const total   = STATS.matrix_users ?? 0;
+  new Chart(document.getElementById('chartCoverage'), {
+    type: 'doughnut',
+    data: {
+      labels: ['With Recommendations', 'Without'],
+      datasets: [{
+        data: [covered, total - covered],
+        backgroundColor: [C.gold, C.blushL],
+        borderColor: ['rgba(201,169,110,0.9)', 'rgba(212,165,165,0.3)'],
+        borderWidth: 2, hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '72%',
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 16, font: { size: 12 } } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.toLocaleString()} users` } }
+      }
+    }
+  });
+}
+
+function chartCategory() {
+  // Build avg price per primary_category from product_catalog.csv
+  const catPrices = {};
+  const catCounts = {};
+  CATALOG.forEach(row => {
+    const cat   = row.primary_category || row.category || 'Other';
+    const price = parseFloat(row.price_usd ?? row.price ?? 0);
+    if (!isNaN(price) && price > 0 && cat) {
+      catPrices[cat] = (catPrices[cat] ?? 0) + price;
+      catCounts[cat] = (catCounts[cat] ?? 0) + 1;
+    }
+  });
+  const avgs = Object.entries(catPrices)
+    .map(([cat, total]) => ({ cat, avg: total / catCounts[cat] }))
+    .filter(x => catCounts[x.cat] >= 3)
+    .sort((a,b) => b.avg - a.avg)
+    .slice(0, 8);
+
+  const colors = [C.esp,C.mocha,C.blush,C.sage,C.gold,C.blushL,C.sageL,C.goldL];
+  new Chart(document.getElementById('chartCategory'), {
+    type: 'bar',
+    data: {
+      labels: avgs.map(x => x.cat),
+      datasets: [{ label: 'Avg Price ($)', data: avgs.map(x => +x.avg.toFixed(2)), backgroundColor: colors, borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(201,169,110,0.1)' }, border: { display: false }, ticks: { callback: v => `$${v}` } },
+        y: { grid: { display: false }, border: { display: false } }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// RECOMMENDER LOOKUP
+// ─────────────────────────────────────────────────────────────
+function lookupUser() {
+  const uid      = document.getElementById('userInput').value.trim();
+  const notFound = document.getElementById('notFound');
+  const results  = document.getElementById('recResults');
+
+  notFound.classList.remove('visible');
+  results.classList.remove('visible');
+
+  if (!uid) return;
+
+  // recommendations.json keys are strings
+  const recs = RECS[uid] || RECS[String(uid)];
+
+  if (!recs || recs.length === 0) {
+    notFound.classList.add('visible');
+    return;
+  }
+
+  document.getElementById('userAvatar').textContent  = uid.charAt(uid.length - 1).toUpperCase();
+  document.getElementById('userIdDisplay').textContent = `User ${uid}`;
+  document.getElementById('userMeta').textContent =
+    `${recs.length} personalised recommendations · Item-item CF · Pearson correlation`;
+
+  const container = document.getElementById('recCards');
+  container.innerHTML = recs.map((rec, i) => {
+    const rating    = parseFloat(rec.predicted_rating ?? 0);
+    const ratingPct = ((rating - 1) / 4 * 100).toFixed(1);
+    const price     = rec.price != null ? `$${parseFloat(rec.price).toFixed(2)}` : 'N/A';
+    return `
+      <div class="rec-card" style="animation-delay:${0.05 + i*0.07}s">
+        <div class="rec-card-rank">№ ${i + 1}</div>
+        <div class="rec-card-name">${rec.product_name ?? 'Unknown'}</div>
+        <div class="rec-card-brand">${rec.brand_name ?? ''}</div>
+        <div class="rec-card-rating">
+          <div class="rating-bar-wrap">
+            <div class="rating-bar-fill" style="width:${ratingPct}%"></div>
+          </div>
+          <div class="rating-val">${rating.toFixed(2)}★</div>
+        </div>
+        <div class="rec-card-price">${price}</div>
+        ${rec.primary_category ? `<div class="rec-card-cat">${rec.primary_category}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  results.classList.add('visible');
+}
+
+// ─────────────────────────────────────────────────────────────
+// TOP PRODUCTS TABLE
+// ─────────────────────────────────────────────────────────────
+function renderTopProducts() {
+  const tbody = document.getElementById('productsBody');
+  tbody.innerHTML = TOP_PRODS.slice(0, 20).map((p, i) => {
+    const rating   = parseFloat(p.avg_rating ?? 0);
+    const filled   = Math.round(rating);
+    const stars    = '★'.repeat(filled) + '☆'.repeat(Math.max(0, 5 - filled));
+    const price    = p.price_usd != null ? `$${parseFloat(p.price_usd).toFixed(2)}` : '—';
+    const reviews  = p.review_count ? parseInt(p.review_count).toLocaleString() : '—';
+    const category = p.primary_category ?? '—';
+    return `<tr>
+      <td><span class="prod-rank">${String(i+1).padStart(2,'0')}</span></td>
+      <td><span class="prod-name">${p.product_name ?? '—'}</span></td>
+      <td><span class="prod-brand">${p.brand_name ?? '—'}</span></td>
+      <td>${category}</td>
+      <td><span class="star-rating">${stars}</span> <span style="font-size:0.8rem;color:var(--mocha)">${rating.toFixed(2)}</span></td>
+      <td><span class="prod-reviews">${reviews}</span></td>
+      <td><span class="prod-price">${price}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// SAMPLE USER IDs — pick 6 random keys from RECS
+// ─────────────────────────────────────────────────────────────
+function renderSampleIds() {
+  const keys = Object.keys(RECS);
+  const picks = [];
+  const step = Math.floor(keys.length / 6);
+  for (let i = 0; i < 6 && i * step < keys.length; i++) picks.push(keys[i * step]);
+
+  const wrap = document.getElementById('sampleIds');
+  wrap.innerHTML = picks.map(id =>
+    `<span class="sample-id-chip" onclick="fillAndLookup('${id}')">${id}</span>`
+  ).join('');
+}
+
+function fillAndLookup(id) {
+  document.getElementById('userInput').value = id;
+  lookupUser();
+  document.getElementById('recommender').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ─────────────────────────────────────────────────────────────
+// SCROLL ANIMATIONS
+// ─────────────────────────────────────────────────────────────
+function initScrollAnimations() {
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+}
+</script>
+</body>
+</html>
